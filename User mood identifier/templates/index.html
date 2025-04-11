@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mood Detector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #bea3df;
+        }
+        h1 {
+            margin-top: 20px;
+        }
+        #preview {
+            max-width: 300px;
+            margin: 20px auto;
+        }
+        video, img {
+            max-width: 300px;
+            margin: 10px;
+        }
+        #mood {
+            font-size: 2em;
+            margin: 20px;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        input[type="file"] {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧠 Mood Detector</h1>
+
+    <button onclick="startWebcam()">Start Webcam</button>
+    <button onclick="stopWebcam()">Stop Webcam</button>
+    <div id="preview">
+        <video id="video" autoplay></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+    <p id="mood">Mood: 😐</p>
+
+    <input type="file" id="imageInput" accept="image/*">
+    <button onclick="uploadImage()">Detect Mood from Image</button>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const moodDisplay = document.getElementById('mood');
+
+        let webcamInterval;
+
+        function startWebcam() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                    webcamInterval = setInterval(captureAndSendFrame, 2000);
+                });
+        }
+
+        function stopWebcam() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            clearInterval(webcamInterval);
+        }
+
+        function captureAndSendFrame() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg');
+
+            fetch('/detect_webcam_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'image=' + encodeURIComponent(imageData)
+            })
+            .then(res => res.json())
+            .then(data => {
+                moodDisplay.textContent = "Mood: " + data.mood;
+            });
+        }
+
+        function uploadImage() {
+            const input = document.getElementById('imageInput');
+            const file = input.files[0];
+            if (!file) return alert("Please choose an image.");
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            fetch('/detect_image_mood', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                moodDisplay.textContent = "Mood: " + data.mood;
+            });
+        }
+    </script>
+</body>
+</html>
