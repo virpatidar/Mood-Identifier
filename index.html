@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mood Detector</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #c3aed6, #f6e6ff);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-top: 40px;
+            font-size: 2.5em;
+            color: #4b0082;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+        }
+
+        #preview {
+            max-width: 350px;
+            margin: 30px auto;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            background: white;
+            padding: 20px;
+        }
+
+        video, img {
+            width: 100%;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+
+        #mood {
+            font-size: 2.2em;
+            color: #5d3b76;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        button {
+            background: #7b2cbf;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 12px 24px;
+            font-size: 16px;
+            margin: 10px 10px 0;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        button:hover {
+            background: #5a189a;
+        }
+
+        input[type="file"] {
+            margin: 20px 0 10px;
+            font-size: 16px;
+            padding: 6px;
+        }
+
+        @media (max-width: 500px) {
+            #preview {
+                max-width: 90%;
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            #mood {
+                font-size: 1.8em;
+            }
+
+            button {
+                width: 80%;
+                font-size: 15px;
+            }
+
+            input[type="file"] {
+                width: 80%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🧠 Mood Detector</h1>
+
+    <div id="preview">
+        <video id="video" autoplay></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <p id="mood">Mood: 😐</p>
+    </div>
+
+    <button onclick="startWebcam()">Start Webcam</button>
+    <button onclick="stopWebcam()">Stop Webcam</button>
+
+    <input type="file" id="imageInput" accept="image/*">
+    <button onclick="uploadImage()">Detect Mood from Image</button>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const moodDisplay = document.getElementById('mood');
+
+        let webcamInterval;
+
+        function startWebcam() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                    webcamInterval = setInterval(captureAndSendFrame, 2000);
+                });
+        }
+
+        function stopWebcam() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+            clearInterval(webcamInterval);
+        }
+
+        function captureAndSendFrame() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg');
+
+            fetch('/detect_webcam_frame', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'image=' + encodeURIComponent(imageData)
+            })
+            .then(res => res.json())
+            .then(data => {
+                moodDisplay.textContent = "Mood: " + data.mood;
+            });
+        }
+
+        function uploadImage() {
+            const input = document.getElementById('imageInput');
+            const file = input.files[0];
+            if (!file) return alert("Please choose an image.");
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            fetch('/detect_image_mood', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                moodDisplay.textContent = "Mood: " + data.mood;
+            });
+        }
+    </script>
+</body>
+</html>
